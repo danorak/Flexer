@@ -3,13 +3,13 @@ computeLayout = require "css-layout"
 class Flexer extends Framer.EventEmitter
 
 	@layoutProps = [
-		"fixedWidth", "fixedHeight", 
-		"minWidth", "minHeight", 
-		"maxWidth", "maxHeight", 
-		"left", "right", "top", "bottom", 
+		"fixedWidth", "fixedHeight",
+		"minWidth", "minHeight",
+		"maxWidth", "maxHeight",
+		"left", "right", "top", "bottom",
 		"margin", "marginLeft", "marginRight", "marginTop", "marginBottom",
 		"padding", "paddingLeft", "paddingRight", "paddingTop", "paddingBottom",
-		# "borderWidth", 
+		# "borderWidth",
 		"borderLeftWidth", "borderRightWidth", "borderTopWidth", "borderBottomWidth",
 		"flexDirection",
 		"justifyContent",
@@ -21,9 +21,9 @@ class Flexer extends Framer.EventEmitter
 
 	# A string to specify an animation for each new layout
 	# It might be interesting to have a different value in a Layer basis
-	curve: undefined
 
 	constructor: (@layer) ->
+
 		@layer.on("change:subLayers", @_subLayersChanged)
 		# TODO Attach the listener only on root layers. Use @_sublayerChanged to modify accordingly
 		Framer.Loop.on("update", @_drawIfNeeded)
@@ -45,10 +45,30 @@ class Flexer extends Framer.EventEmitter
 		for property of Flexer.layoutProps
 			if @layer[property]
 				@_layoutNode.style[@_getLayoutProperty(property)] = @layer[property]
-		
+
 		@_updateTree
 			added: @layer.children
 			removed: []
+
+		Object.defineProperty @, "curve",
+			default: undefined
+			configurable: true
+			get: ->
+				@_curve
+			set: (value) ->
+				@_curve = value
+
+		Object.defineProperty @, "time",
+			default: undefined
+			configurable: true
+			get: ->
+				@_time
+			set: (value) ->
+				if isFinite(value)
+					@_time = value
+				else
+					console.error('The value provided for time must be numeric.')
+					@_time = 0
 
 	_didResize: =>
 		if not @layer.superLayer
@@ -59,7 +79,7 @@ class Flexer extends Framer.EventEmitter
 	_getLayoutProperty: (property) ->
 		cssLayoutProperty = property
 		# We rename 'width' and 'height' css-layout props to 'fixedWidth' and 'fixedHeight'
-		# so we don't overwrite Framer original 'width' and 'height' Layer props 
+		# so we don't overwrite Framer original 'width' and 'height' Layer props
 		if cssLayoutProperty is "fixedWidth" then cssLayoutProperty = "width"
 		if cssLayoutProperty is "fixedHeight" then cssLayoutProperty = "height"
 		return cssLayoutProperty
@@ -74,7 +94,7 @@ class Flexer extends Framer.EventEmitter
 				delete @_layoutNode._default
 				@_layoutNode.style = {}
 			@_layoutNode.style[@_getLayoutProperty(property)] = value
-		
+
 		@_setNeedsUpdate()
 
 	_subLayersChanged: (layersChanged) =>
@@ -89,8 +109,13 @@ class Flexer extends Framer.EventEmitter
 
 	_setNeedsUpdate: =>
 		rootLayer = @layer
-		while rootLayer.superLayer
-			rootLayer = rootLayer.superLayer
+		_findRoot = (r) ->
+			if not r.superLayer
+				return r
+			_findRoot r.superLayer
+
+		rootLayer = _findRoot rootLayer
+
 		rootLayer.layout.needsUpdate = true
 
 	_drawIfNeeded: =>
@@ -111,7 +136,7 @@ class Flexer extends Framer.EventEmitter
 	_updateLayer: (computedTree) ->
 		if computedTree.shouldUpdate
 			if not @curve
-				frame = 
+				frame =
 					x: computedTree.layout.left
 					y: computedTree.layout.top
 					width: computedTree.layout.width
@@ -125,6 +150,7 @@ class Flexer extends Framer.EventEmitter
 						width: computedTree.layout.width
 						height: computedTree.layout.height
 					curve: @curve
+					time: @time
 		for subLayer, i in @layer.subLayers
 			if computedTree.children and computedTree.children.length > i
 				subLayer.layout._updateLayer(computedTree.children[i])
@@ -138,9 +164,9 @@ Layer.define "layout",
 # Adding Flexer properties to Layer
 for layoutProp in Flexer.layoutProps
 	do (layoutProp) =>
-		Layer.define layoutProp, 
+		Layer.define layoutProp,
 			default: undefined
-			get: -> 
+			get: ->
 				@_getPropertyValue layoutProp
 			set: (value) ->
 				@._setPropertyValue layoutProp, value
